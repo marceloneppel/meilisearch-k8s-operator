@@ -1,23 +1,27 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-# For a complete list of supported options, see:
-# https://juju.is/docs/sdk/metadata-reference
-name: template-operator
+name: meilisearch-k8s
 description: |
-  TEMPLATE-TODO: fill out the charm's description
+  Charm to operate the Meilisearch search engine on Kubernetes clusters
 summary: |
-  TEMPLATE-TODO: fill out the charm's summary
+  Charm to operate the Meilisearch search engine on Kubernetes clusters
 
-# TEMPLATE-TODO: replace with containers for your workload (delete for non-k8s)
 containers:
-  httpbin:
-    resource: httpbin-image
+  meilisearch:
+    resource: meilisearch-image
+    mounts:
+      - storage: data
+        location: /meili_data
 
-# TEMPLATE-TODO: each container defined above must specify an oci-image resource
 resources:
-  httpbin-image:
+  meilisearch-image:
     type: oci-image
-    description: OCI image for httpbin (kennethreitz/httpbin)
+    description: OCI image for Meilisearch (getmeili/meilisearch)
     # Included for simplicity in integration tests
-    upstream-source: kennethreitz/httpbin
+    upstream-source: getmeili/meilisearch:v0.28.1
+
+storage:
+  data:
+    type: filesystem
+    description: Data storage for Meilisearch
