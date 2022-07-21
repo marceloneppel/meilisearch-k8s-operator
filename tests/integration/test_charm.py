@@ -4,12 +4,14 @@
 
 
 import logging
-import urllib.request
 from pathlib import Path
 
+import meilisearch
 import pytest
 import yaml
 from pytest_operator.plugin import OpsTest
+
+from tests.integration.helpers import search
 
 logger = logging.getLogger(__name__)
 
@@ -19,18 +21,18 @@ APP_NAME = METADATA["name"]
 
 @pytest.mark.abort_on_fail
 async def test_build_and_deploy(ops_test: OpsTest):
-    """Build the charm-under-test and deploy it together with related charms.
+    """Build the charm-under-test and deploy it.
 
-    Assert on the unit status before any relations/configurations take place.
+    Assert on the unit status before any other checks.
     """
-    # build and deploy charm from local source folder
+    # Build and deploy charm from local source folder.
     charm = await ops_test.build_charm(".")
-    resources = {"httpbin-image": METADATA["resources"]["httpbin-image"]["upstream-source"]}
+    resources = {
+        "meilisearch-image": METADATA["resources"]["meilisearch-image"]["upstream-source"]
+    }
     await ops_test.model.deploy(charm, resources=resources, application_name=APP_NAME)
 
-    # issuing dummy update_status just to trigger an event
-    await ops_test.model.set_config({"update-status-hook-interval": "10s"})
-
+    # Wait for the desired status.
     await ops_test.model.wait_for_idle(
         apps=[APP_NAME],
         status="active",
@@ -39,17 +41,28 @@ async def test_build_and_deploy(ops_test: OpsTest):
     )
     assert ops_test.model.applications[APP_NAME].units[0].workload_status == "active"
 
-    # effectively disable the update status from firing
-    await ops_test.model.set_config({"update-status-hook-interval": "60m"})
-
 
 @pytest.mark.abort_on_fail
-async def test_application_is_up(ops_test: OpsTest):
-    status = await ops_test.model.get_status()  # noqa: F821
+async def test_search_engine_is_up(ops_test: OpsTest):
+    # Get the IP address of the deployed unit.
+    status = await ops_test.model.get_status()
     address = status["applications"][APP_NAME]["units"][f"{APP_NAME}/0"]["address"]
 
-    url = f"http://{address}"
+    # Create the meilisearch client.
+    client = meilisearch.Client(f"http://{address}:7700", "masterKey")
 
-    logger.info("querying app address: %s", url)
-    response = urllib.request.urlopen(url, data=None, timeout=2.0)
-    assert response.code == 200
+    # Define some documents.
+    documents = [
+        {"id": 1, "title": "Carol", "genres": ["Romance", "Drama"]},
+        {"id": 2, "title": "Wonder Woman", "genres": ["Action", "Adventure"]},
+    ]
+
+    # Get a reference to the index that will be created.
+    index = client.index("movies")
+
+    # Add some documents to the index and wait for the update to finish.
+    index.add_documents(documents)
+
+    # Search for a document using a query containing a typo.
+    result = search(index, "caorl")
+    assert result["hits"][0]["id"] == 1
