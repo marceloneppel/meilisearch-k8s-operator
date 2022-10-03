@@ -7,6 +7,9 @@ description: |
 summary: |
   Charm to operate the Meilisearch search engine on Kubernetes clusters
 
+maintainers:
+  - Marcelo Henrique Neppel <marcelo.neppel@gmail.com>
+
 containers:
   meilisearch:
     resource: meilisearch-image
